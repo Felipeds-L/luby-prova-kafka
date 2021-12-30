@@ -1,0 +1,36 @@
+version: "3"
+
+networks:
+  luby_projects:
+    external: true
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: ./docker/api/Dockerfile
+    ports:
+      - "3333:3333"
+    volumes:
+      - .:/app
+    networks:
+      - luby_projects
+    depends_on:
+      - mysql
+  mysql:
+    build:
+      context: ./docker/db
+      # dockerfile: ./Docker/db/Dockerfile
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: prova_adonis
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - luby_projects
+
+volumes:
+  db-data:
+
