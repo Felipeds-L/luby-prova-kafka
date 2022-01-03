@@ -6,8 +6,12 @@ import EmailValidator from 'App/Validators/EmailValidator';
 import UserNameValidator from 'App/Validators/UserNameValidator';
 import LevelAccess from 'App/Models/LevelAccess';
 
-const nodemailer = require('nodemailer');
+const { Kafka } = require('kafkajs');
 
+const kafka = new Kafka({
+  clientId: 'my-app',
+  brokers: ['localhost:9092']
+})
 
 export default class UsersController{
   public async index({ auth, response }: HttpContextContract) {
@@ -49,8 +53,19 @@ export default class UsersController{
       const find_user = await User.findByOrFail('email', data.email)
       const find_level = await UserLevelAccess.findByOrFail('user_id', find_user.id)
       const find_leve_name = await LevelAccess.findOrFail(find_level.level_access_id)
-      // this.congratSingIn(user.id)
 
+      const message = {
+        user: {email: data.email, username: data.username}
+      }
+
+      const producer = kafka.producer()
+      await producer.connect()
+      await producer.send({
+        topic: 'congratsNewUser',
+        messages: [
+          { value: JSON.stringify(message) },
+        ],
+      })
       return response.status(200).json({created: true, user: user.username, level_access: find_leve_name.level})
     }catch{
       return response.status(400).json({Error: 'Can not create the user, please try it again!'})
@@ -85,7 +100,6 @@ export default class UsersController{
     }else{
       return response.status(403).json({Error: `Only Administrators can see another user information`})
     }
-
   }
 
   public async update({ request, response, auth }: HttpContextContract) {
@@ -119,52 +133,29 @@ export default class UsersController{
   }
 
   public async forgotPassword({ request, response}: HttpContextContract){
-    const email = await request.only(['email'])
+    const email = await request.only(['email', 'redirect_url'])
     const user = await User.findByOrFail('email', email.email)
     user.token = (Math.random() * 323242).toString()
     user.token_created_at = new Date()
 
-    await user.save()
+    try{
+      await user.save()
 
-    let transport = nodemailer.createTransport({
-      host: "smtp.mailtrap.io",
-      port: 2525,
-      auth: {
-        user: "583128b8852a7b",
-        pass: "495b0a35ecc53b"
+      const producer = kafka.producer()
+      await producer.connect()
+      const message = {
+        user: {email: user.email, username: user.username, token: user.token, url: email.redirect_url}
       }
-    });
-
-    let message = {
-      from: "noreply@milk.com",
-      to: user.email,
-      subject: "Recuperação de Senha",
-      text: `Prezado(a) ${user.username}. \n\n segue abaixo informações para que possa recuperar sua senha. \n\n
-      Use o token: ${user.token}`,
-      html: `<strong>Recuperação de Senha<strong>
-
-      <p>Olá ${user.username}, você solicitou uma recuperação de senha.</p>
-
-      <p>Para dar prosseguimento, utilize o token ${user.token}</p>
-
-      <a href="${request.input('redirec_url')}?token=${user.token}">Reset Password</a>
-      `
-    };
-
-    transport.sendMail(message, function(err) {
-      if(err){
-        return response.status(400).json({
-          erro: true,
-          message: "Email can't bee sent"
-        })
-      }
-    })
-
-
-    return response.status(200).send({
-      error: false,
-      message: 'Email sent correctly'
-    })
+      await producer.send({
+        topic: 'forgot-password',
+          messages: [
+            { value: JSON.stringify(message) },
+          ],
+      })
+      return response.status(200).json({Message: 'A email has been sent to you, for the reset of password'})
+    }catch{
+      return response.status(400).json({Error: `Can not reset password, try it again!`})
+    }
   }
 
   public async resetPassword({ request, response}: HttpContextContract){
@@ -175,34 +166,11 @@ export default class UsersController{
       user.token = '';
       user.password = password
       await user.save()
-
       return response.status(200).send({Error: {Message: `the password for the user ${user.email} has been changed correctly!`}})
+
     }catch(err){
       return response.status(err.status).send({Error: {Message: 'Something is wrong, verify the email!'}})
     }
   }
-
-  public async congratSingIn(user_id){
-    const user = await User.findOrFail(user_id)
-    let transport = nodemailer.createTransport({
-      host: "smtp.mailtrap.io",
-      port: 2525,
-      auth: {
-        user: "583128b8852a7b",
-        pass: "495b0a35ecc53b"
-      }
-    });
-
-    let message = {
-      from: "noreply@milk.com",
-      to: user.email,
-      subject: "Sua conta foi criada!",
-      text: `Prezado(a) ${user.username}. \n\n, seja muito bem vindo, sua conta foi criada com sucesso!. \n\n`,
-      html: `<p>Prezado(a) ${user.username}. \n\n, seja muito bem vindo, sua conta foi criada com sucesso!. <br><br></p>`
-    };
-
-    transport.sendMail(message)
-  }
-
 
 }
