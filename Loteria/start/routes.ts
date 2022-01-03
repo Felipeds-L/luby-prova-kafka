@@ -9,6 +9,7 @@ Route.group(() => {
   Route.post('/users/forgot-password','UsersController.forgotPassword')
   Route.post('/users/reset-password','UsersController.resetPassword')
   Route.post('/users', 'UsersController.store')
+  Route.post('/bet', 'BetsController.testRoute')
 }).prefix('/api')
 
 Route.group(() =>{

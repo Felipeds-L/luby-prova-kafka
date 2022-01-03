@@ -1,22 +1,17 @@
 import { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
 import { Kafka } from 'kafkajs';
-
-const kafka = new Kafka({
-  clientId: 'my-app',
-  brokers: ['kafka1:9092', 'kafka2:9092']
-})
-
-const nodemailer = require('nodemailer');
-
-
-
 import Bet from 'App/Models/Bet'
 import User from 'App/Models/User'
 import UserLevelAccess from 'App/Models/UserLevelAccess';
 import Game from 'App/Models/Game';
 import Cart from 'App/Models/Cart';
 
+const nodemailer = require('nodemailer');
+
+
+
 export default class BetsController {
+
   public async index({ auth, response }: HttpContextContract) {
     const bet = await Bet.all()
     const user = await User.findOrFail(auth.user?.id)
@@ -46,6 +41,7 @@ export default class BetsController {
 
     if(sum_price >= cart_value){
       const user = await User.findOrFail(auth.user?.id)
+      const admins = await UserLevelAccess.query().where('level_access_id', 1)
 
       let isBetAlreadyMade = false
       let inBetAlreadyExists = false
@@ -105,8 +101,43 @@ export default class BetsController {
                   return response.status(500).json({Error: `Verify on the position: ${x} if there's a duplicated number!`})
                 }
               }
-              // this.newBet(user.id)
+
+              const kafka = new Kafka({
+                clientId: 'my-app',
+                brokers: ['localhost:9092']
+              })
+              const new_producer = kafka.producer()
+
+              await new_producer.connect()
+
+              const message = {
+                user: {username: user.username, email: user.email}
+              }
+              new_producer.send({
+                topic: 'sendEmailToUserWhenMakeABet',
+                messages: [
+                  { value: JSON.stringify(message) },
+                ],
+              })
+              for(let x = 0; x < admins.length; x++){
+
+                const user_admin = await User.findOrFail(admins[x].user_id)
+
+                const admins_message = {
+                  admin: {username: user_admin.username, email: user_admin.email, gamer: user.username}
+                }
+
+                new_producer.send({
+                  topic: 'sendEmailToAdmins',
+                  messages: [
+                    { value: JSON.stringify(admins_message) },
+                  ],
+                })
+              }
+              await new_producer.disconnect()
+
               return response.status(200).json({created: true})
+
             }catch{
               return response.status(500).json({Error: 'Can not make the bet, please try it again!'})
             }
@@ -120,10 +151,6 @@ export default class BetsController {
     }else{
       return response.status(500).json({Error: `Your bet only cost ${sum_price}, the minimun is ${cart_value}`})
     }
-
-
-
-
   }
 
   public async show({ params, auth, response }: HttpContextContract) {
