@@ -106,25 +106,27 @@ export default class BetsController {
                 clientId: 'my-app',
                 brokers: ['localhost:9092']
               })
+              const producer = kafka.producer()
               const new_producer = kafka.producer()
 
               await new_producer.connect()
-
+              await producer.connect()
               const message = {
                 user: {username: user.username, email: user.email}
               }
-              new_producer.send({
+              producer.send({
                 topic: 'sendEmailToUserWhenMakeABet',
                 messages: [
                   { value: JSON.stringify(message) },
                 ],
               })
+              // send a email to every administrator when a player made a bet
               for(let x = 0; x < admins.length; x++){
 
                 const user_admin = await User.findOrFail(admins[x].user_id)
 
                 const admins_message = {
-                  admin: {username: user_admin.username, email: user_admin.email, gamer: user.username}
+                  admin: {username: user_admin.username, email: user_admin.email, player: user.username}
                 }
 
                 new_producer.send({
@@ -135,6 +137,7 @@ export default class BetsController {
                 })
               }
               await new_producer.disconnect()
+              await producer.disconnect()
 
               return response.status(200).json({created: true})
 

@@ -8,33 +8,30 @@ const kafka = new Kafka({
 })
 
 const topic = 'sendEmailToAdmins'
-const consumer = kafka.consumer( {groupId: 'bet-emails-admin'})
-const consumer2 = kafka.consumer( {groupId: 'bet-emails'})
+const consumer = kafka.consumer( {groupId: 'bet-emails'})
+const consumer2 = kafka.consumer( {groupId: 'admin-group'})
 
 // Send messages to all the admins when a user make a bet
 async function runBetFromAdmins(){
   await consumer.connect()
   await consumer.subscribe( { topic } )
   await consumer.run({
-    eachMessage: async ({ topic, partition, message }) => {
+    eachMessage: async ({ message }) => {
       console.log('Show show only the part of admins: ' + message.value.toString())
       const admins = message.value.toString()
       const admin_toJSON = JSON.parse(admins)
       const email = admin_toJSON.admin.email
       const username = admin_toJSON.admin.username
-      const gamer_name = admin_toJSON.admin.gamer
-      newBetAdmin(username, email, gamer_name)
+      const player = admin_toJSON.admin.player
+      newBetAdmin(username, email, player)
     },
   })
-
-  await consumer.disconnect()
 } 
-
 async function runBetFromUser(){
   await consumer2.connect()
   await consumer2.subscribe( { topic: 'sendEmailToUserWhenMakeABet' } )
   await consumer2.run({
-    eachMessage: async ({topic, partition, message}) => {
+    eachMessage: async ({ message }) => {
       console.log('Should show the part of user: ' + message.value.toString())
       const user = message.value.toString()
       const user_toJSON  = JSON.parse(user)
@@ -46,10 +43,8 @@ async function runBetFromUser(){
 
 }
 
-
-runBetFromAdmins().catch(console.error)
 runBetFromUser().catch(console.error)
-
+runBetFromAdmins().catch(console.error)
 
 
 async function newBet(username, email){
