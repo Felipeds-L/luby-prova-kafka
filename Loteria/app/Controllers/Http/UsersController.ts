@@ -166,10 +166,10 @@ export default class UsersController{
       user.token = '';
       user.password = password
       await user.save()
-      return response.status(200).send({Error: {Message: `the password for the user ${user.email} has been changed correctly!`}})
+      return response.status(200).json({Message: `the password for the user ${user.email} has been changed correctly!`})
 
     }catch(err){
-      return response.status(err.status).send({Error: {Message: 'Something is wrong, verify the email!'}})
+      return response.status(err.status).json( {Message: 'Something is wrong, verify the email!'})
     }
   }
 

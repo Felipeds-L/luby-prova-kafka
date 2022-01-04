@@ -13,12 +13,12 @@ const kafka = new Kafka({
 
 const topic = 'sendEmailToAdmins'
 const consumer = kafka.consumer( {groupId: 'bet-emails'})
-const consumer2 = kafka.consumer( {groupId: 'admin-group'})
+const consumer_admin = kafka.consumer( {groupId: 'admin-group'})
 const consumer_congrats = kafka.consumer( {groupId: 'congrats-user'})
 const consumer_resetPassword = kafka.consumer( {groupId: 'forgot-password'})
 
 // Send messages to all the admins when a user make a bet
-// functionando
+
 async function runBetFromAdmins(){
   await consumer.connect()
   await consumer.subscribe( { topic } )
@@ -26,24 +26,21 @@ async function runBetFromAdmins(){
     eachMessage: async ({ message }) => {
       const admins = message.value.toString()
       const admin_toJSON = JSON.parse(admins)
-      const email = admin_toJSON.admin.email
-      const username = admin_toJSON.admin.username
-      const player = admin_toJSON.admin.player
+      const {email, username, player} = admin_toJSON.admin
       newBetAdmin(username, email, player)
     },
   })
 } 
 
-//funcionando
+
 async function runBetFromUser(){
-  await consumer2.connect()
-  await consumer2.subscribe( { topic: 'sendEmailToUserWhenMakeABet' } )
-  await consumer2.run({
+  await consumer_admin.connect()
+  await consumer_admin.subscribe( { topic: 'sendEmailToUserWhenMakeABet' } )
+  await consumer_admin.run({
     eachMessage: async ({ message }) => {
       const user = message.value.toString()
       const user_toJSON  = JSON.parse(user)
-      const email = user_toJSON.user.email
-      const username = user_toJSON.user.username
+      const {email, username} = user_toJSON.user
       newBet(username, email)
     }
   })
@@ -56,8 +53,7 @@ async function runCongrats(){
     eachMessage: async ({ message }) => {
       const user = message.value.toString()
       const user_toJSON  = JSON.parse(user)
-      const email = user_toJSON.user.email
-      const username = user_toJSON.user.username
+      const {email, username} = user_toJSON.user
       congratSingIn(email, username)
     }
   })
@@ -70,10 +66,7 @@ async function resetPasswors(){
     eachMessage: async ({ message }) => {
       const user = message.value.toString()
       const user_toJSON  = JSON.parse(user)
-      const email = user_toJSON.user.email
-      const username = user_toJSON.user.username
-      const token = user_toJSON.user.token
-      const url = user_toJSON.user.url
+      const {email, username, token, url} = user_toJSON.user
       forgotPassowrd(email, username, token, url)
     }
   })

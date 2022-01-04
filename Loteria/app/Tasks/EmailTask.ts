@@ -7,7 +7,7 @@ const nodemailer = require('nodemailer');
 export default class EmailTask extends BaseTask {
 	public static get schedule() {
 
-		return '* * 9 * * *'
+		return '0 30 * * * *'
 	}
 	/**
 	 * Set enable use .lock file for block run retry task
@@ -19,6 +19,7 @@ export default class EmailTask extends BaseTask {
 
 	public async handle() {
     this.findNoBetUser()
+
   }
 
   public async findNoBetUser(){
@@ -28,14 +29,21 @@ export default class EmailTask extends BaseTask {
     let lastWeekDate = new Date()
     lastWeekDate.setTime(lastWeekDate.getTime()-lastWeek)
 
-    for(let x = 0; x<user.length; x++){
+    // Error too many emails, for is running more than once
+    console.log(user.length)
+    let x = 0
+
+    while(x<user.length){
       const bet = await Bet.query().where('user_id', user[x].id).whereBetween('created_at', [lastWeekDate, currentDate])
       if(bet.length > 0){
+        console.log(x)
         console.log(`The user ${user[x].username} already made a bet on the last 7 days`)
       }else{
+        console.log(x)
         console.log(`The user ${user[x].username} don't make a bet yet, an email will be sent`)
         this.sendMail(user[x].id)
       }
+      x++
     }
   }
 
